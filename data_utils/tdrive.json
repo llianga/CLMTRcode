@@ -1,0 +1,63 @@
+{
+    "region":
+    {
+      "cityname":"beijing",
+      "minlon":116.1,
+      "minlat":39.50023,
+      "maxlon":116.79997,
+      "maxlat":40.29981,
+      "cellsize":100.0,
+      "minfreq":10
+    },
+    "traj":
+    {
+      "cityname":"beijing",
+      "minlon":116.0,
+      "minlat":38.00843,
+      "maxlon":117.0,
+      "maxlat":40.99738,
+      "xstep":100.0,
+      "ystep":100.0,
+      "maxvocab_size": 1000000,
+      "vocab_start":4,
+      "k":10,
+      "minfreq":10
+    },
+    "time":
+    {
+      "cityname":"beijing",
+      "mintime":1201930244, 
+      "maxtime":1202463559, 
+      "mintimefreq":10,
+      "maxvocab_size": 60000,
+      "timestep":10
+    },
+    "semantic":
+    {
+      "cityname":"NYC",
+      "minlon":-74.27476644515991,
+      "minlat":40.55085246740427,
+      "maxlon":-73.68382519820906,
+      "maxlat":40.9883317192653,
+      "xstep":100.0,
+      "ystep":100.0,
+      "maxvocab_size": 1000000,
+      "vocab_start":4,
+      "k":10,
+      "minfreq":2
+    },
+    "poi_tdrive_v1":
+    {
+      "cityname":"beijing",
+      "minlon":116.0,
+      "minlat":38.00843,
+      "maxlon":117.0,
+      "maxlat":40.99738,
+      "xstep":50.0,
+      "ystep":50.0,
+      "maxvocab_size": 1000000,
+      "vocab_start":4,
+      "k":10,
+      "minfreq":5
+    }
+  }
