@@ -6,7 +6,6 @@ from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.data.dataloader import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
-from tensorboardX import SummaryWriter
 import h5py
 import numpy as np
 import pandas as pd
@@ -52,7 +51,6 @@ def save_checkpoint(state, is_best):
             Config.data_path, 'best_model.pt'))
 
 def load_checkpoint(model, optimizer):
-    # device = torch.device('cpu')
     device = torch.device('cuda') if torch.cuda.is_available else torch.device('cpu')
     checkpoint = torch.load(Config.checkpoint)
     start_iteration = checkpoint["iteration"]
@@ -80,10 +78,8 @@ def get_trgtimelist(traj_seq):
             date_obj = datetime.datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
             t = datetime.datetime.fromtimestamp(date_obj.timestamp())
             t = [t.hour, t.minute, t.second, t.year, t.month, t.day]
-            # x = torch.Tensor(t).float()
             x = t
             one_list.append(x)
-        # print('one_list.type', one_list.type)
         all_list.append(torch.Tensor(one_list))
     all_list = pad_sequence(all_list, batch_first=True)
     return all_list
@@ -99,7 +95,6 @@ def getTimeEmbedding(traj_seq):
 
 def get_trajvocabs(traj_seq):
     grid_file = os.path.join('data', Config.DATASETS.grid_file)
-    # print(Config.DATASETS.grid_file)
     Grid = pickle.load(open(grid_file, 'rb'), encoding='bytes')
     vocablist = []
     for i in range(len(traj_seq)):
@@ -122,7 +117,7 @@ def getSpatialEmbedding(traj_seq, flag='encoder'):
         trajs_emb_cell = [embs[list(t)] for t in traj_seq]
     else:
         vocablist = get_trajvocabs(traj_seq)
-        trajs_emb_cell = [embs[list(t)] for t in vocablist] #embs存放的是产生cell的embedding的模型
+        trajs_emb_cell = [embs[list(t)] for t in vocablist] 
     
     trajs_emb_cell = pad_sequence(trajs_emb_cell, batch_first = True)
     return trajs_emb_cell #[batch_size, max_seqlen, spatial_embedding_size]
@@ -133,7 +128,7 @@ def get_textvocabs(traj_seq):
     vocablist = []
     for i in range(len(traj_seq)):
         temp_vocab = []
-        for j in range(len(traj_seq[i])): #self.word2vocab[word] = i+self.vocab_start
+        for j in range(len(traj_seq[i])): 
             vocabid = Vocab.word2vocab[traj_seq[i][j][3]]
             temp_vocab.append(vocabid)         
         vocablist.append(temp_vocab)
@@ -141,7 +136,6 @@ def get_textvocabs(traj_seq):
 
 def get_trgTextvocab(traj_seq):
     vocablist = get_textvocabs(traj_seq)
-    # trajs_vocab_seq = [[constants.BOS]+t+[constants.EOS] for t in vocablist]  
     trajs_vocab_seq = [torch.tensor(t) for t in vocablist]
     trajs_vocab_seq = pad_sequence(trajs_vocab_seq, batch_first=True)
     return trajs_vocab_seq
@@ -176,11 +170,9 @@ def getTextEmbedding(traj_seq):
     return t2v #[batch_size, max_seqlen, text_embedding_size]
 
 def validate(model):
-    # switch to evaluation mode
     model.eval()
     total_loss = 0
     trajs_file = os.path.join('data', Config.DATASETS.dataset)
-    # _, eval_dataset, _ = read_traj_dataset(trajs_file)
     _, eval_dataset, _ = read_postraj_dataset(trajs_file)
    
     eval_dataloader = DataLoader(eval_dataset, 
@@ -212,7 +204,6 @@ def validate(model):
     
     trajs_file = os.path.join('data', Config.DATASETS.poi_st_tdrive_vali_similar_file)
     rank = test_model(model, trajs_file)
-    # switch back to training mode
     model.train()
    
     return rank, total_loss
@@ -222,24 +213,20 @@ def test_model(model,testtrajs_file):
     query_lst, db_lst = pickle.load(open(testtrajs_file, 'rb'), encoding='bytes') # query_lst:(1000, 不定长, 3) db_lst(8000, 不定长, 3)
     results = []
     querys, databases = test_trajs_to_embs(model, query_lst, db_lst)
-    print('querys.shape: ', querys.shape)
-    print('databases.shape: ', databases.shape)
     
-    dists = torch.cdist(querys, databases, p = 1) # [1000, 100000]
-    targets = torch.diag(dists) # [1000]
+    dists = torch.cdist(querys, databases, p = 1) 
+    targets = torch.diag(dists)
     
-    # rank = torch.sum(torch.le(dists.T, targets)).item() / len(query_lst)
     rank = torch.sum(torch.le(dists.T, targets)).item() / querys.shape[0]
     results.append(rank)
-    # logging.info('[EXPFlag]task=newsimi,encoder=TrajCL,varying=dbsize,r1={:.3f},r2={:.3f},r3={:.3f},r4={:.3f},r5={:.3f}' \
-    #                                         .format(*results))
+    
     return rank
 
-def test_trajs_to_embs(model, query_lst, db_lst): # query_lst:(1000, 不定长, 3) db_lst(8000, 不定长, 3)   
+def test_trajs_to_embs(model, query_lst, db_lst):
     querys = []
     databases = []
-    num_query = len(query_lst)# 1000
-    num_database = 4000#len(db_lst) #8000  
+    num_query = len(query_lst)
+    num_database = 4000  
     batch_size = num_query
     test_batch = Config.SOLVER.test_batchsize
     if num_query <= test_batch:
@@ -253,7 +240,6 @@ def test_trajs_to_embs(model, query_lst, db_lst): # query_lst:(1000, 不定长, 
     else:
         i = 0
         while i < num_query:
-            print(f"i: {i} ------------------------------")
             trajseq, trajlens = collate_for_test(query_lst[i:i+test_batch])
             traj_spatial_seq = getSpatialEmbedding(trajseq)
             traj_time_seq = getTimeEmbedding(trajseq)
@@ -274,15 +260,12 @@ def test_trajs_to_embs(model, query_lst, db_lst): # query_lst:(1000, 不定长, 
     else:
         i = 0
         while i < num_database:
-            print(f"j: {i} ------------------------------")
             trajseq, trajlens = collate_for_test(db_lst[i:i+test_batch])
             traj_spatial_seq = getSpatialEmbedding(trajseq)
             traj_time_seq = getTimeEmbedding(trajseq)
             traj_text_seq = getTextEmbedding(trajseq)
-            trajs2_emb = model.interpret(traj_spatial_seq, traj_time_seq, traj_text_seq, trajlens)
-            
+            trajs2_emb = model.interpret(traj_spatial_seq, traj_time_seq, traj_text_seq, trajlens)     
             databases.append(trajs2_emb.detach().cpu().numpy())
-            # print(databases[0].device)
             i += test_batch
     import numpy as np
     
@@ -292,7 +275,6 @@ def test_trajs_to_embs(model, query_lst, db_lst): # query_lst:(1000, 不定长, 
     return querys, databases
 
 def test():
-    # set_seed(2000)
     device = torch.device('cpu')
     if Config.SOLVER.use_gpu and torch.cuda.is_available():
         device = torch.device('cuda')
@@ -331,11 +313,9 @@ def train(load_model=None, load_optimizer=None):
     scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer, step_size=Config.SOLVER.LR_STEP, gamma=Config.SOLVER.LR_GAMMA)
     
-    writer = SummaryWriter(logdir=Config.logdir)
-    checkpointer = CheckPointer(model, optimizer, save_dir='checkpoints_simv3')
+    checkpointer = CheckPointer(model, optimizer, save_dir='checkpoints')
     trajs_file = os.path.join('data', Config.DATASETS.dataset)
     print(trajs_file)
-    # train_dataset, _, _ = read_traj_dataset(trajs_file)
     train_dataset, _, _ = read_postraj_dataset(trajs_file)
     train_dataloader = DataLoader(train_dataset, 
                                     batch_size = Config.SOLVER.train_batchsize, 
@@ -357,12 +337,12 @@ def train(load_model=None, load_optimizer=None):
             
             trajs2_time_seq = getTimeEmbedding(trajs2_seq)
             trajs2_spatial_seq = getSpatialEmbedding(trajs2_seq)
-            trajs2_text_seq = getTextEmbedding(trajs2_seq) #bert
+            trajs2_text_seq = getTextEmbedding(trajs2_seq) 
             
             
             trgtraj_spatial_seq = getSpatialEmbedding(trgtrajs_seq)
             trgtraj_time_seq = getTimeEmbedding(trgtrajs_seq)
-            trgtraj_text_seq = getTextEmbedding(trgtrajs_seq) #bert
+            trgtraj_text_seq = getTextEmbedding(trgtrajs_seq) 
            
             
             logits, labels, inter_logits, inter_targets = model(trgtraj_spatial_seq, trgtraj_time_seq, trgtraj_text_seq, trgtrajs_lens,
@@ -371,18 +351,13 @@ def train(load_model=None, load_optimizer=None):
             loss, intra_loss, inter_loss = model.loss_fn_interintra(logits, labels, inter_logits, inter_targets)
             
             loss = loss / Config.SOLVER.train_batchsize
-            # print('------------------loss-----------------', loss.item())
-            writer.add_scalar('total_loss', loss.item(), global_step=n_iter)
-            writer.add_scalar('intra_loss', intra_loss.item(), global_step=n_iter)
-            writer.add_scalar('inter_loss', inter_loss.item(), global_step=n_iter)
             
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             n_iter += 1
             if i_batch % Config.SOLVER.print_freq == 0 and i_batch:
-                # logger.info("[Training] ep-batch={}-{}, total_loss={:.3f},intra_loss={:.3f},inter_loss={:.3f},spatial_loss={:.3f},time_loss={:.3f},text_loss={:.3f}, @={:.3f}"
-                #             .format(i_ep, i_batch, loss,intra_loss.item(), inter_loss.item(), spatial_loss.item(), time_loss.item(), text_loss.item(), time.time() - _time_batch_start))
+                
                 logger.info("[Training intra+inter] ep-batch={}-{}, total_loss={:.3f},intra_loss={:.3f},inter_loss={:.3f}, @={:.3f}"
                             .format(i_ep, i_batch, loss,intra_loss.item(), inter_loss.item(), time.time() - _time_batch_start))
         
@@ -390,12 +365,7 @@ def train(load_model=None, load_optimizer=None):
         logger.info(f"Current learning rate: {optimizer.param_groups[0]['lr']}")
         if i_ep % Config.SOLVER.save_freq == 0 and i_ep: 
             rank, vali_loss = validate(model)
-            
-            writer.add_scalar('vali_loss', vali_loss, global_step=i_ep)
-            writer.add_scalar('rank', rank, global_step=i_ep)
-            writer.add_scalar('learning_rate', scheduler.get_last_lr()[
-                              0], global_step=i_ep)
-            
+                  
             logger.info(
                 f"\nvalidata model with loss {vali_loss} at epoch {i_ep} \n"
                 f"rank : {rank} \n")
@@ -412,8 +382,6 @@ if __name__ == '__main__':
     Config.merge_from_file(args.config_file) 
     Config.logdir = os.path.join(
         'logs', time.strftime("%Y%m%d%H%M%S", time.localtime())) 
-    # Config.logdir = os.path.join(
-    #     'test_logs', time.strftime("%Y%m%d%H%M%S", time.localtime())) 
     if not os.path.exists(Config.logdir):
         os.mkdir(Config.logdir)
     Config.freeze() 

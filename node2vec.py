@@ -25,7 +25,6 @@ def train_node2vec(edge_index):
     loader = model.loader(batch_size=32, shuffle=True, num_workers=4)
     optimizer = torch.optim.SparseAdam(list(model.parameters()), lr=0.001)
     checkpoint_file = Config.spatial_embedding_file + '/' + Config.DATASETS.dataset + '_node2vec_cell' + str(int(Config.cell_size)) + '_best.pt'
-    # embs_file = Config.dataset_embs_file
     embs_file = 'cell' + str(Config.cell_size) + '_embdim' + str(Config.spatial_embedding_size) + '_dataset' + str(Config.DATASETS.dataset) + '_embs.pkl'
     embs_file = os.path.join('models', embs_file)
 

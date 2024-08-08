@@ -21,8 +21,6 @@ class MoCo(nn.Module):
 
         self.criterion = nn.CrossEntropyLoss()
 
-        # create the encoders
-        # num_classes is the output fc dimension
         self.encoder_q = encoder_q
         self.encoder_k = encoder_k
 
@@ -30,12 +28,12 @@ class MoCo(nn.Module):
         self.mlp_k = Projector(nemb, nout)
 
         for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
-            param_k.data.copy_(param_q.data)  # initialize
-            param_k.requires_grad = False  # not update by gradient
+            param_k.data.copy_(param_q.data)  
+            param_k.requires_grad = False  
 
         for param_q, param_k in zip(self.mlp_q.parameters(), self.mlp_k.parameters()):
-            param_k.data.copy_(param_q.data)  # initialize
-            param_k.requires_grad = False  # not update by gradient
+            param_k.data.copy_(param_q.data)  
+            param_k.requires_grad = False 
 
         # create the queue
         self.register_buffer("queue", torch.randn(nout, queue_size))
@@ -62,7 +60,6 @@ class MoCo(nn.Module):
         batch_size = keys.shape[0]
 
         ptr = int(self.queue_ptr)
-        # assert self.queue_size % batch_size == 0  # for simplicity
         
         if ptr + batch_size <= self.queue_size:
             self.queue[:, ptr:ptr + batch_size] = keys.T
@@ -70,43 +67,30 @@ class MoCo(nn.Module):
             self.queue[:, ptr:self.queue_size] = keys.T[:, 0:self.queue_size-ptr]
             self.queue[:, 0:batch_size-self.queue_size+ptr] = keys.T[:, self.queue_size-ptr:]
 
-        # replace the keys at ptr (dequeue and enqueue)
-        ptr = (ptr + batch_size) % self.queue_size  # move pointer
+        ptr = (ptr + batch_size) % self.queue_size  
 
         self.queue_ptr[0] = ptr
 
  
-    def forward(self, kwargs_q, kwargs_k): #self.clmodel({'src': trajs1_emb, 'attn_mask': None, 'src_padding_mask': src_padding_mask1, 'src_len': trajs1_len, 'srcspatial': trajs1_emb_p},  
-                #{'src': trajs2_emb, 'attn_mask': None, 'src_padding_mask': src_padding_mask2, 'src_len': trajs2_len, 'srcspatial': trajs2_emb_p})
-
-        # compute query features
+    def forward(self, kwargs_q, kwargs_k): 
         output, rtn = self.encoder_q(**kwargs_q)
-        q = self.mlp_q(rtn)  # queries: NxC
-        q = nn.functional.normalize(q, dim=1) #
+        q = self.mlp_q(rtn)  
+        q = nn.functional.normalize(q, dim=1) 
 
         with torch.no_grad():
-            self._momentum_update_key_encoder()  # update the key encoder 每次都对key的编码器和mlp进行动量更新
+            self._momentum_update_key_encoder()  
             output, rtn = self.encoder_k(**kwargs_k)
-            k = self.mlp_k(rtn)  # keys: NxC
+            k = self.mlp_k(rtn) 
             k = nn.functional.normalize(k, dim=1)
 
-        # compute logits
-        # Einstein sum is more intuitive
-        # positive logits: Nx1
-        l_pos = torch.einsum('nc,nc->n', [q, k]).unsqueeze(-1) #求相似度
-        # negative logits: NxK
-        l_neg = torch.einsum('nc,ck->nk', [q, self.queue.clone().detach()]) #不需要计算梯度，q和队列中的是负样本
-
-        # logits: Nx(1+K)
+       
+        l_pos = torch.einsum('nc,nc->n', [q, k]).unsqueeze(-1) 
+        l_neg = torch.einsum('nc,ck->nk', [q, self.queue.clone().detach()]) 
         logits = torch.cat([l_pos, l_neg], dim=1)
 
-        # apply temperature
         logits /= self.temperature
-
-        # labels: positive key indicators，标明正样本
-        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda() #N*(1+K), 第1列即index=0时是正样本的相似性
-
-        # dequeue and enqueue
+        
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda() 
         self._dequeue_and_enqueue(k)
 
         return logits, labels

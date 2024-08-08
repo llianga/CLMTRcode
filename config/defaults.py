@@ -69,7 +69,7 @@ _C.SOLVER.test_batchsize = 32
 _C.SOLVER.print_freq = 50
 _C.SOLVER.save_freq = 2
 _C.SOLVER.use_gpu = True
-_C.SOLVER.epochs = 150
+_C.SOLVER.epochs = 50
 
 _C.MISC = CN()
 

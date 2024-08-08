@@ -25,12 +25,9 @@ class Date2vec(nn.Module):
                 t = [t.hour, t.minute, t.second, t.year, t.month, t.day]
                 x = torch.Tensor(t).float()
                 embed = self.d2v(x)
-                # embed = self.d2v(timestamp)
                 one_list.append(embed)
-            # print('---one_list----', one_list)
             one_list = torch.cat(one_list, dim=0)
             one_list = one_list.view(-1, Config.time_embedding_size)
-            # print('-------------one_list.shape-------------: ', one_list.shape)
             all_list.append(one_list.clone().detach())
         all_list = pad_sequence(all_list, batch_first = True) 
         return all_list
@@ -49,7 +46,6 @@ class Text2Vec(nn.Module):
                 one_list.append(embed)
             one_list = torch.cat(one_list, dim=0)
             one_list = one_list.view(-1, Config.text_embedding_size)
-            # print('-------------one_list.shape-------------: ', one_list.shape)
             all_list.append(one_list.clone().detach())
         all_list = pad_sequence(all_list, batch_first = True) 
         return all_list 
@@ -90,9 +86,8 @@ class Fusion_Layer(nn.Module):
             nn.Dropout(0.1)
         )
         self.layer_norm = nn.LayerNorm(int(dim*0.5), eps=1e-6)
-    def forward(self, seq_s, seq_t, src_len): #seq_s [batch_size,seq_len, spatial_embedding_size+time_embedding_size], seq_t [batch_size, seq_len, text_embedding_size]
-        #spatial_embedding_size+time_embedding_size = text_embedding_size = seq_embedding_dim
-        h = torch.stack([seq_s, seq_t], 2)  #[batch_size, seq_len, 2, seq_embedding_dim]
+    def forward(self, seq_s, seq_t, src_len): 
+        h = torch.stack([seq_s, seq_t], 2)  
         q = self.Wq(h)
         k = self.Wk(h)
         v = self.Wv(h)
@@ -105,7 +100,6 @@ class Fusion_Layer(nn.Module):
         att_t = attn_o[:, :, 1, :]
         output = torch.cat((att_s, att_t), dim=2) #output: [batch_size, seq_len, seq_embedding_dim]
         rtn = torch.sum(output, 1)
-        # rtn = rtn.to(self.device)
         rtn = rtn / src_len.unsqueeze(-1).expand(rtn.shape) #rtn:[batch_size, seq_embedding_dim]
         return output, rtn  
     
@@ -193,7 +187,6 @@ class Sttext_Traj_Encoder(nn.Module):
         self.fusionlayer = Fusion_Layer(ninput).to(device)
     
     def forward(self, spatial_seq, time_seq, text_seq, trajs_lens):
-        # trajs_lens = trajs_lens.to(self.device)
         max_trgtrajs_len = trajs_lens.max().item() # in essense --  
         src_padding_mask = torch.arange(max_trgtrajs_len)[None, :] >= trajs_lens[:, None] #[batch_size, seq_len] 值为true的位置会被mask，长度小于该batch中的max_len的部分会被mask
         src_padding_mask = src_padding_mask.to(self.device) 
@@ -270,8 +263,8 @@ class MultiModal_2vec(nn.Module):
         inter_logits, inter_targets = self.clmodel({'spatial_seq': trajs1_spatial_seq, 'time_seq': trajs1_time_seq, 'text_seq': trajs1_text_seq, 'trajs_lens': trajs1_lens},  
                 {'spatial_seq': trajs2_spatial_seq, 'time_seq': trajs2_time_seq, 'text_seq': trajs2_text_seq, 'trajs_lens': trajs2_lens})
         
-        max_trgtrajs_len = trgtrajs_lens.max().item() # in essense --    
-        src_padding_mask = torch.arange(max_trgtrajs_len)[None, :] >= trgtrajs_lens[:, None] #[batch_size, seq_len] 值为true的位置会被mask，长度小于该batch中的max_len的部分会被mask
+        max_trgtrajs_len = trgtrajs_lens.max().item()    
+        src_padding_mask = torch.arange(max_trgtrajs_len)[None, :] >= trgtrajs_lens[:, None] 
         src_padding_mask = src_padding_mask.to(self.device)
         _, st_vec = self.encoder_q.stencoder(trgtraj_spatial_seq, trgtraj_time_seq, None, src_padding_mask, trgtrajs_lens) #[batch_size, spatial_embedding_size+time_embedding_size]
         _, text_vec = self.encoder_q.textencoder(trgtraj_text_seq, None, src_padding_mask, trgtrajs_lens) #[batch_size, text_embedding_size]
@@ -289,11 +282,9 @@ class MultiModal_2vec(nn.Module):
         similarity_matrix = torch.matmul(features, features.T)
         mask = torch.eye(labels.shape[0], dtype=torch.bool).to(features.device)
         labels = labels[~mask].view(labels.shape[0], -1)
-        # try:
         similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)       
         
         positives = similarity_matrix[labels.bool()].view(labels.shape[0], -1)
-        # select only the negatives the negatives
         negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
         logits = torch.cat([positives, negatives], dim=1)
         labels = torch.zeros(logits.shape[0], dtype=torch.long).to(features.device)

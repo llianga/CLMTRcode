@@ -19,19 +19,16 @@ class TextDataset(Dataset):
         self.data = data
           
     def __getitem__(self, i):
-       #返回的必须是tensor/array/list等数据类型，整个数据集中的数据长度是相等的 
-        return self.data[i]
+       return self.data[i]
 
     def __len__(self):
         return len(self.data)
     
 def collate_and_augment(text_embeddings):
-    # 对短语进行分词和编码
     embedding_seq = []
     for i in range(len(text_embeddings)):
         embedding_seq.append(torch.tensor(text_embeddings[i])) 
     embedding_seq = pad_sequence(embedding_seq, batch_first = True)
-    # print('embedding_seq.shape----------', embedding_seq.shape)
     return embedding_seq
 
 class Text2VecConvert:
@@ -40,7 +37,7 @@ class Text2VecConvert:
         self.model = Text2Vec(k=Config.text_embedding_size)
         self.model.load_state_dict(state_dict)
         self.model.eval()
-        # print(2)
+       
     
     def __call__(self, x):
         with torch.no_grad(): 
@@ -61,28 +58,17 @@ class Text2Vec(nn.Module):
 
     def forward(self, x):
         out = self.fc1(x)
-        # print('-------------out1.shape:------------- ', out.shape)
         out = self.d2(self.fc2(out))
-        # print('-------------out.shape:------------- ', out.shape)
-        
         out = self.fc3(out)
-        # print('-------------fc3: out.shape:------------- ', out.shape)
         out = self.fc4(out)
-        # print('-------------fc4: out.shape:------------- ', out.shape)
         out = self.fc5(out)
-        # print('-------------fc5: out.shape:------------- ', out.shape)
         return out
 
     def encode(self, x):
         out1 = self.fc1(x)
-        # out2 = self.fc2(out1)
-        # out = self.fc3(out2)
         out = self.fc3(out1)
         return out
     
-    # def loss(self, out, x):
-    #     loss = nn.MSELoss(out,x)
-    #     return loss
 
 def train_text2Vec(device, texts):
     model = Text2Vec()
@@ -90,7 +76,6 @@ def train_text2Vec(device, texts):
     scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer, step_size=Config.SOLVER.LR_STEP, gamma=Config.SOLVER.LR_GAMMA)
     criterion = nn.MSELoss()
-    #获取训练数据
 
     train_dataset = TextDataset(texts)
     train_dataloader = DataLoader(
@@ -98,7 +83,6 @@ def train_text2Vec(device, texts):
         batch_size=32,
         shuffle=True,
         collate_fn=collate_and_augment)
-    # print('------------train_dataloader-------------',train_dataloader)
     model = model.to(device)
     model.train()
     epoch_train_loss_best = 10000000.0
@@ -110,15 +94,13 @@ def train_text2Vec(device, texts):
     for i in range(total_epoch):
         total_loss = 0
         time_ep = time.time()
-        for input in tqdm(train_dataloader): #遍历数据集中的每个batch
+        for input in tqdm(train_dataloader): 
             batch_size = len(input)
             input = input.to(device)
-            # print('input.shape: ', input.shape)
             output = model(input)
-            # print('-----------output.shape-------------', output.shape)
             loss = criterion(output.to(device), input.to(device))
-            total_loss += loss.item()  #为了得到每个epoch的损失
-            loss = loss / batch_size #每个数据的损失
+            total_loss += loss.item()  
+            loss = loss / batch_size 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -140,7 +122,6 @@ def train_text2Vec(device, texts):
 
 @torch.no_grad()
 def get_bert_embeddings(device, texts):
-    # 加载预训练的BERT模型和分词器
     model_name = 'bert-base-uncased'
     tokenizer = BertTokenizer.from_pretrained(model_name)
     bert_model = BertModel.from_pretrained(model_name)
@@ -154,33 +135,22 @@ def get_bert_embeddings(device, texts):
         tokens = tokenizer.tokenize(texts[i])
         token_ids.append(tokenizer.convert_tokens_to_ids(tokens))
         attention_masks.append([1] * len(tokens))
-        # 对序列进行填充和掩码处理
         max_length = max(len(ids) for ids in token_ids)
         padded_token_ids = [ids + [0] * (max_length - len(ids)) for ids in token_ids]
         attention_masks = [masks + [0] * (max_length - len(masks)) for masks in attention_masks]
-        # 转换为张量
         input_ids = torch.tensor(padded_token_ids)
         attention_masks = torch.tensor(attention_masks)
         sequence_lengths = torch.tensor([len(ids) for ids in token_ids]).unsqueeze(-1).float()
         sequence_lengths = sequence_lengths.to(device)
-        # 获取BERT模型的输出
         input_ids = input_ids.to(device)
         attention_masks = attention_masks.to(device)
-        # print(i, texts[i])
         outputs = bert_model(input_ids, attention_mask=attention_masks)
-        # print('--------texts i-------:', i)
-        # 获取最后一层的隐藏状态作为嵌入
         last_hidden_state = outputs.last_hidden_state
-        # print('----last_hidden_state----', last_hidden_state.shape)
-        # 使用掩码矩阵计算平均池化向量
         mask = attention_masks.unsqueeze(-1).expand(last_hidden_state.size()).float()
         masked_hidden_state = last_hidden_state * mask
         summed_hidden_state = torch.sum(masked_hidden_state, dim=1)
         average_hidden_state = summed_hidden_state / sequence_lengths
-        # print('----average_hidden_state----', average_hidden_state.shape)
         output_vecs[texts[i]] = average_hidden_state.squeeze().tolist()
-    # print('len(outputs): ',len(output_vecs))
-    # print('outputs[0]: ', output_vecs[0].shape)
     return output_vecs         
 
 if __name__ == "__main__":
@@ -202,12 +172,7 @@ if __name__ == "__main__":
             keywords.append(textdata[i][j])
     keywords = list(set(keywords))
     output_vecs = get_bert_embeddings(device, keywords)
-    print('---------------len(output_vecs)-----------', len(output_vecs))
-    # first_pair = next(iter(output_vecs.items()))
-    # print(first_pair)
     
     pickle.dump(output_vecs, open('data/test_output_vecs', 'wb'), protocol=2)
-    # print('--------output_vecs-----------', len(output_vecs))
-    # print(len(output_vecs[0]))
     output_vecs = pickle.load(open('data/test_output_vecs', 'rb'), encoding='bytes')
     train_text2Vec(device, output_vecs)

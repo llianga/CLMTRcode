@@ -102,9 +102,7 @@ class Grid():
    
     def makeVocab(self, trajdata):
         self.cellcount = defaultdict(list)
-        ## useful for evaluating the size of region bounding box
         num_out_region = 0
-        ## scan all trips (trajectories)
         for i in range(len(trajdata)):
             for j in range(len(trajdata[i])):
                 lon, lat = trajdata[i][j][0], trajdata[i][j][1]
@@ -131,7 +129,6 @@ class Grid():
         for cell in self.hotcell:
             x, y = self.cell2coord(cell)
             coord.append([x,y])
-        # print(coord)
         self.hotcell_kdtree = KDTree(coord, leaf_size=2) 
         self.built = True
 
@@ -222,10 +219,7 @@ class Grid():
     def get_cellid_by_xyidx(self, i_x: int, i_y: int):
         return i_x * self.numy + i_y
     
-    def k_neighbours_cell_pairs_permutated(self): #返回每个hotcell的k近邻
-        # (i, i) are NOT included
-        # if (1, 2) in the result, no (2, 1)
-        # diagonal are included
+    def k_neighbours_cell_pairs_permutated(self): 
         
         all_cell_knnpairs = []
         all_vocab_knnpairs_id = []
@@ -238,28 +232,28 @@ class Grid():
                 kvocab = self.hotcell2vocab[kcells[i]]
                 if kvocab == vocab:
                     continue
-                all_cell_knnpairs.append((cell, kcells[i])) #cell_id对
+                all_cell_knnpairs.append((cell, kcells[i])) 
                 all_vocab_knnpairs_id.append((vocab, kvocab))
         return all_cell_knnpairs, all_vocab_knnpairs_id
 
 def init_grid(_device,trajdata):
-    # with open('data_utils/tdrive.json', 'r') as traj_param_file:
-    #     traj_params = json.load(traj_param_file)
-    # maxlon = traj_params["poi_tdrive_v1"]["maxlon"]
-    # minlon = traj_params["poi_tdrive_v1"]["minlon"]
-    # maxlat = traj_params["poi_tdrive_v1"]["maxlat"]
-    # minlat = traj_params["poi_tdrive_v1"]["minlat"]
-    # minfreq = traj_params["poi_tdrive_v1"]["minfreq"]
-    # xstep = traj_params["poi_tdrive_v1"]["xstep"]
-    # ystep = traj_params["poi_tdrive_v1"]["ystep"]
-    # maxvocab_size = traj_params["poi_tdrive_v1"]["maxvocab_size"]
-    # vocab_start =  traj_params["poi_tdrive_v1"]["vocab_start"]
-    # k =  traj_params["poi_tdrive_v1"]["k"]
-    # name = traj_params["poi_tdrive_v1"]["cityname"]
-    # grid = Grid(maxlon, minlon, maxlat, minlat, minfreq, xstep, ystep, maxvocab_size, vocab_start, k, name)
+    with open('data_utils/tdrive.json', 'r') as traj_param_file:
+        traj_params = json.load(traj_param_file)
+    maxlon = traj_params["poi_tdrive_v1"]["maxlon"]
+    minlon = traj_params["poi_tdrive_v1"]["minlon"]
+    maxlat = traj_params["poi_tdrive_v1"]["maxlat"]
+    minlat = traj_params["poi_tdrive_v1"]["minlat"]
+    minfreq = traj_params["poi_tdrive_v1"]["minfreq"]
+    xstep = traj_params["poi_tdrive_v1"]["xstep"]
+    ystep = traj_params["poi_tdrive_v1"]["ystep"]
+    maxvocab_size = traj_params["poi_tdrive_v1"]["maxvocab_size"]
+    vocab_start =  traj_params["poi_tdrive_v1"]["vocab_start"]
+    k =  traj_params["poi_tdrive_v1"]["k"]
+    name = traj_params["poi_tdrive_v1"]["cityname"]
+    grid = Grid(maxlon, minlon, maxlat, minlat, minfreq, xstep, ystep, maxvocab_size, vocab_start, k, name)
     
-    # grid.makeVocab(trajdata) 
-    # pickle.dump(grid, open('data/poi_grid_cellsize_100_minfreq_5', 'wb'), protocol=2)
+    grid.makeVocab(trajdata) 
+    pickle.dump(grid, open('data/poi_grid_cellsize_100_minfreq_5', 'wb'), protocol=2)
     grid = pickle.load(open('data/poi_grid_cellsize_100_minfreq_5', 'rb'), encoding='bytes')
     _, all_vocab_knnpairs_id = grid.k_neighbours_cell_pairs_permutated()
     all_vocab_knnpairs_id.append((0,0))
@@ -267,9 +261,6 @@ def init_grid(_device,trajdata):
     all_vocab_knnpairs_id.append((2,2))
     all_vocab_knnpairs_id.append((3,3))
     edge_index = torch.tensor(all_vocab_knnpairs_id, dtype = torch.long, device = _device).T
-    
-    print(edge_index.shape)
-    print(edge_index.device)
     train_node2vec(edge_index)
     return
 
@@ -280,7 +271,6 @@ def transtimes(timedata):
             timestamp = timedata[i][j]
             date_obj = datetime.datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
             t = datetime.datetime.fromtimestamp(date_obj.timestamp())
-            # t = datetime.datetime.fromtimestamp(timestamp)
             t = [t.hour, t.minute, t.second, t.year, t.month, t.day]
             times.append(t)
     return times
@@ -329,11 +319,8 @@ class Interval():
     
     def makeVocab(self, timedata):
         self.cellcount = defaultdict(list)
-        ## useful for evaluating the size of region bounding box
         num_out_time = 0
-        ## scan all trips (trajectories)
         for i in range(len(timedata)):
-            # for j in range(len(timedata[i])):
             t = timedata[i]
             if not self.timeinterval(t):
                 num_out_time += 1
@@ -343,7 +330,6 @@ class Interval():
                     self.cellcount[cell_id] = 1
                 else:
                     self.cellcount[cell_id] += 1 
-        ## filter out all hot cells
         self.max_num_hotcells = min(self.maxvocab_size, len(self.cellcount))
         self.topcellcount = dict(sorted(self.cellcount.items(), key=lambda d: d[1], reverse=True))
         self.hotcell = []
@@ -354,7 +340,6 @@ class Interval():
         for (i, cell) in enumerate(self.hotcell):
             self.hotcell2vocab[cell] = i+self.vocab_start
         self.vocab2hotcell = {value:key for key,value in self.hotcell2vocab.items()}
-        ## vocabulary size
         self.vocab_size = self.vocab_start + len(self.hotcell)
         y = list(np.zeros(len(self.hotcell)))
         self.D2_hotcell = list(zip(self.hotcell, y))
@@ -375,11 +360,7 @@ class Interval():
         kcells, _ = self.knearestHotcells(cell, 1)
         return kcells[0]
     
-    """
-    k-nearest vocabs and corresponding distances for each vocab.
-
-    This is used in training for KLDiv loss.
-    """
+    
     def saveKNearestVocabs(self):
         V = np.zeros((self.vocab_size, self.k))
         D = np.zeros((self.vocab_size, self.k))
@@ -400,11 +381,6 @@ class Interval():
         f["V"], f["D"] = V, D
         f.close()
 
-    """
-    Return the vocab id for a cell in the region.
-    If the cell is not hot cell, the function will first search its nearest
-    hotcell and return the corresponding vocab id.
-    """
     def cell2vocab(self, cell):
         if self.hotcell2vocab[cell]:
             return self.hotcell2vocab[cell]
@@ -448,13 +424,10 @@ def initvocab():
     vocab.keyword2vocab(keywords)
     textvocab = os.path.join('data', Config.DATASETS.textvocab_file)
     pickle.dump(vocab, open(textvocab, 'wb'), protocol=2)
-    # print(len(vocab.word2vocab))
-    # print(vocab.vocab_size)
-
 
 if __name__ == '__main__':
     args = parse.get_args()
-    Config.merge_from_file(args.config_file) #
+    Config.merge_from_file(args.config_file) 
     device = torch.device('cpu')
     if Config.SOLVER.use_gpu and torch.cuda.is_available():
         device = torch.device('cuda')
@@ -467,7 +440,7 @@ if __name__ == '__main__':
     timedata = data["time_seqs"]
     textdata = data["keyword_seqs"]
     
-    # init_grid(device, trajdata) #获得空间embedding及相应的模型
+    init_grid(device, trajdata) 
     
     random.shuffle(timedata)
     random_numbers = random.sample(range(len(timedata)), 10000)
@@ -476,30 +449,30 @@ if __name__ == '__main__':
     print(Config.time_embedding_size)
     train_d2vec(device, times)
     
-    # keywords = getkeywords(textdata)
-    # keywords.append('bos')
-    # keywords.append('eos')
-    # output_vecs = get_bert_embeddings(device, keywords)
-    # textembeddingfile = os.path.join('data', Config.DATASETS.textembeddings_file)
-    # pickle.dump(output_vecs, open(textembeddingfile, 'wb'), protocol=2)
+    keywords = getkeywords(textdata)
+    keywords.append('bos')
+    keywords.append('eos')
+    output_vecs = get_bert_embeddings(device, keywords)
+    textembeddingfile = os.path.join('data', Config.DATASETS.textembeddings_file)
+    pickle.dump(output_vecs, open(textembeddingfile, 'wb'), protocol=2)
     
-    # output_vecs = pickle.load(open(textembeddingfile, 'rb'), encoding='bytes')
-    # training_embeddings = []
-    # for i in output_vecs.keys():
-    #     training_embeddings.append(output_vecs[i])
-    # train_text2Vec(device, training_embeddings)
-    # initvocab()
-    # testfile = os.path.join('data', Config.DATASETS.poi_st_tdrive_test_similar_file)
-    # valifile = os.path.join('data', Config.DATASETS.poi_st_tdrive_vali_similar_file)
-    # generate_newsimi_test_dataset(dataset, testfile, is_vali=False)
-    # generate_newsimi_test_dataset(dataset, valifile, is_vali=True)
-    # testori = os.path.join('data', Config.DATASETS.poi_st_tdrive_test_knn_query)
-    # testcq = os.path.join('data', Config.DATASETS.poi_st_tdrive_test_knn_changedquery)
-    # testdb = os.path.join('data', Config.DATASETS.poi_st_tdrive_test_knn_db)
-    # valitori = os.path.join('data', Config.DATASETS.poi_st_tdrive_vali_knn_query)
-    # valicq = os.path.join('data', Config.DATASETS.poi_st_tdrive_vali_knn_changedquery)
-    # validb = os.path.join('data', Config.DATASETS.poi_st_tdrive_vali_knn_db)
-    # generate_knn_test_dataset(dataset, valitori, valicq, validb, True)
+    output_vecs = pickle.load(open(textembeddingfile, 'rb'), encoding='bytes')
+    training_embeddings = []
+    for i in output_vecs.keys():
+        training_embeddings.append(output_vecs[i])
+    train_text2Vec(device, training_embeddings)
+    initvocab()
+    testfile = os.path.join('data', Config.DATASETS.poi_st_tdrive_test_similar_file)
+    valifile = os.path.join('data', Config.DATASETS.poi_st_tdrive_vali_similar_file)
+    generate_newsimi_test_dataset(dataset, testfile, is_vali=False)
+    generate_newsimi_test_dataset(dataset, valifile, is_vali=True)
+    testori = os.path.join('data', Config.DATASETS.poi_st_tdrive_test_knn_query)
+    testcq = os.path.join('data', Config.DATASETS.poi_st_tdrive_test_knn_changedquery)
+    testdb = os.path.join('data', Config.DATASETS.poi_st_tdrive_test_knn_db)
+    valitori = os.path.join('data', Config.DATASETS.poi_st_tdrive_vali_knn_query)
+    valicq = os.path.join('data', Config.DATASETS.poi_st_tdrive_vali_knn_changedquery)
+    validb = os.path.join('data', Config.DATASETS.poi_st_tdrive_vali_knn_db)
+    generate_knn_test_dataset(dataset, valitori, valicq, validb, True)
    
 
     

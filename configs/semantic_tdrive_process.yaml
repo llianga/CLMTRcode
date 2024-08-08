@@ -9,7 +9,6 @@ DATASETS:
   grid_file: 'poi_grid_cellsize_100_minfreq_5'
   timeinterval_file: 'poi_time_timestep_10_minfreq_10'
   textvocab_file: 'textvocab_st_tdrive'
-  # test_newsimi_raw_filepath: 'poi_test_mostsimilar'
 vocab_size: 132459
 timevocab_size: 52647
 textvocab_size: 4531

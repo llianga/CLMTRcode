@@ -376,7 +376,6 @@ def getsimpsttraj(data):
             tmp_text.append(vocab_id)
         new_textdata.append(tmp_text)
     kseg_trajs = ksimplify(trajdata, new_timedata, new_textdata)      
-    # pickle.dump(kseg_trajs, open("data/simptrajs", 'wb'), protocol=2)
     pickle.dump(kseg_trajs, open("data/st_simptrajs", 'wb'), protocol=2)
     
 def getneighbor(trajs, data, trajdata, k=3):
@@ -390,59 +389,36 @@ def getneighbor(trajs, data, trajdata, k=3):
             tmp.append(timestamp)
         timestampdata.append(tmp)
             
-    # ball_tree = BallTree(trajs)
     kd_tree = KDTree(trajs, leaf_size=2)
     positivetrajs = []
     knnid_list = []
     for i in range(len(trajs)):
-        # tmp_trajpair = []
         ori_spatial_seq, ori_time_seq, ori_text_seq = spatialdata[i], timestampdata[i], textdata[i]
-        # dist, index = ball_tree.query([trajs[i]], k) 
         dist, index = kd_tree.query([trajs[i]], k) 
         min_dist = 10000000
         min_id = i
         if i in knnid_list:
             continue
-        print(i)
-        # knnid_list.append(index[0])
-        # print(index[0])
         for ind in index[0]:
-            # if i==ind:
-            #     continue
             spatial_seq, time_seq, text_seq = spatialdata[ind], timestampdata[ind], textdata[ind]
-            # print('spatial_seqs: ', ori_spatial_seq)
-            # print(spatial_seq)
             sp_dist = spatial_frechet_dis(spatial_seq, ori_spatial_seq)
             time_dist = time_frechet_dis(time_seq, ori_time_seq)
             text_dist = Levenshtein.distance(ori_text_seq, text_seq)
-            # text_dist = edit_dis(ori_text_seq, text_seq)
-            # print('distances: ', sp_dist, time_dist, text_dist)
             total_dist = 10*sp_dist + 0.00005* time_dist + 0.001*text_dist
-            # print("---total_dist---: ", total_dist)
             if total_dist < min_dist:
                 min_id = ind
                 min_dist = total_dist
-        # print("i and min_id: ", i, min_id)
         knnid_list.append(min_id)
         positivetrajs.append([trajdata[i], trajdata[min_id]])
-         
-        # positivetrajs.append(tmp_trajpair)   
-        # print("the nearest id: ", min_id)
-    # print(len(positivetrajs[0]))
-    # print(len(positivetrajs[0][0]), len(positivetrajs[0][1]))
-    # print("knn id list: ", knnid_list)
-    # pickle.dump(positivetrajs, open("data/vali_positivetrajs", 'wb'), protocol=2)
-    # pickle.dump(knnid_list, open("data/vali_knnid_list", 'wb'), protocol=2)
     return positivetrajs
 
 def get_augmented_postrajs(positivetrajs):
     aug1 = get_aug_fn('downsampling')
-    aug2 = get_aug_fn('distort')
+    aug2 = get_aug_fn('subset')
     aug_trajs = []
     for i in range(len(positivetrajs)):
         traj1 = aug1(positivetrajs[i][0])
         traj2 = aug2(positivetrajs[i][1])
-        # print(len(traj2))
         aug_trajs.append([traj1, traj2])
     return aug_trajs
        
@@ -452,18 +428,13 @@ if __name__ == '__main__':
     Config.merge_from_file(args.config_file) 
     trajs_file = os.path.join('data', Config.DATASETS.dataset)
     data = pickle.load(open(trajs_file, 'rb'), encoding='bytes')
-    # getsimpsttraj(data)
+    getsimpsttraj(data)
     trajdata = data["ori_trajs"]
     
     simptrajs = pickle.load(open("data/st_simptrajs", 'rb'), encoding='bytes')
-    # print(len(simptrajs))
-    simptrajsdata = simptrajs[:10000]
-    # print(len(simptrajsdata))
-    positivetrajs = getneighbor(simptrajsdata, data, trajdata)
+    positivetrajs = getneighbor(simptrajs, data, trajdata)
     aug_trajs = get_augmented_postrajs(positivetrajs)
-    print(len(aug_trajs))
-    print(len(aug_trajs[0]))
-    pickle.dump(aug_trajs, open("data/augmented_trajs_v3", 'wb'), protocol=2)
+    pickle.dump(aug_trajs, open("data/augmented_trajs", 'wb'), protocol=2)
     
     
     
