@@ -10,13 +10,13 @@ This is a pytorch implementation of the paper "CLMTR: A generic framework for co
 ## Quick Start
 The datasets can be downloaded from [here](https://drive.google.com/file/d/1kntOZ5x9rpWzQtM9HrWUogxhAYxAsyx0/view?usp=drive_link), and tar -xzvf tdrive-samples.tar.gz
 
-### Preprocessing
+Preprocessing the datasets:
 ```bash
  python semantictraj_preprocessing.py --config 'configs/semantic_tdrive_process.yaml'
  python preprocessing.py --config 'configs/semantic_tdrive_process.yaml'
 ```
 
-### Training
+To train CLMTR and test it: 
 
 ```bash
  python train.py --config 'configs/semantic_tdrive_batch256.yaml'
