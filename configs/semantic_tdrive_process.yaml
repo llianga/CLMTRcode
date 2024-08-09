@@ -5,7 +5,7 @@ SOLVER:
   test_batchsize: 200
   print_freq: 10
 DATASETS:
-  dataset: 'poi_simplified_st_tdrive'
+  dataset: 'tdrive-samples'
   grid_file: 'poi_grid_cellsize_100_minfreq_5'
   timeinterval_file: 'poi_time_timestep_10_minfreq_10'
   textvocab_file: 'textvocab_st_tdrive'

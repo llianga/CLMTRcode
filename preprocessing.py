@@ -432,6 +432,7 @@ if __name__ == '__main__':
     trajdata = data["ori_trajs"]
     
     simptrajs = pickle.load(open("data/st_simptrajs", 'rb'), encoding='bytes')
+    simptrajs = simptrajs[:40000]
     positivetrajs = getneighbor(simptrajs, data, trajdata)
     aug_trajs = get_augmented_postrajs(positivetrajs)
     pickle.dump(aug_trajs, open("data/augmented_trajs", 'wb'), protocol=2)
